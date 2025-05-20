@@ -36,6 +36,10 @@
       <option value="A4">A4 - Alta Tensão 2,3 a 25kV</option>
     </select>
 
+    
+
+    <input type="hidden" id="bandeira" value="verde" />
+
     <label for="currentBill">Valor total da fatura (R$):</label>
     <input type="number" id="currentBill" step="0.01" oninput="atualizarResumo()" />
 
@@ -44,13 +48,10 @@
 
     <label for="desconto">Desconto sobre parte negociável (%):</label>
     <select id="desconto" onchange="atualizarResumo()">
-      <option value="10">10%</option>
-      <option value="9">9%</option>
-      <option value="8">8%</option>
-      <option value="7">7%</option>
-      <option value="6">6%</option>
-      <option value="5">5%</option>
-    </select>
+  <option value="10">10%</option>
+  <option value="12">12%</option>
+  <option value="15">15%</option>
+</select>
 
     <label for="nomeCliente">Nome do Cliente:</label>
     <input type="text" id="nomeCliente" />
@@ -65,9 +66,20 @@
     <h2>Resumo da Proposta</h2>
     <div class="linha">Fatura Original: <span id="resumoOriginal">R$ 0,00</span></div>
     <div class="linha">Custo Negociável: <span id="resumoNegociavel">R$ 0,00</span></div>
+    <div class="linha">Custo de Disponibilidade: <span id="resumoReserva">R$ 0,00</span></div>
     <div class="linha">Desconto Aplicado: <span id="resumoDescontoValor">R$ 0,00</span></div>
     <div class="linha">Valor com Desconto: <span id="resumoDesconto">R$ 0,00</span></div>
     <div class="linha">Economia Anual: <span id="resumoAnual">R$ 0,00</span></div>
+    <div class="linha">Valor Médio kWh: <span id="resumoValorKwh">R$ 0,00</span></div>
+    <hr />
+    <div class="linha">Economia Anual Verde: <span id="economiaVerde">R$ 0,00</span></div>
+    <div class="linha">Economia Anual Amarela: <span id="economiaAmarela">R$ 0,00</span></div>
+    <div class="linha">Economia Anual Vermelha 1: <span id="economiaV1">R$ 0,00</span></div>
+    <div class="linha">Economia Anual Vermelha 2: <span id="economiaV2">R$ 0,00</span></div>
+    <div class="linha">Desconto Verde: <span id="porcentagemVerde">0%</span></div>
+    <div class="linha">Desconto Amarela: <span id="porcentagemAmarela">0%</span></div>
+    <div class="linha">Desconto Vermelha 1: <span id="porcentagemV1">0%</span></div>
+    <div class="linha">Desconto Vermelha 2: <span id="porcentagemV2">0%</span></div>
   </div>
 
   <script>
@@ -84,66 +96,139 @@
       }
     }
 
+    window.onload = function () {
+      carregarDistribuidoras();
+    }
+    // Regras GD: cálculo de custo de disponibilidade por grupo
+    const reservasMinimasPorGrupo = {
+      B1: 30,
+      B2: 30,
+      B3: 50,
+      B4: 100,
+      A2: 100,
+      A3: 100,
+      A4: 100
+    };
+
     function atualizarResumo() {
       const currentBill = parseFloat(document.getElementById('currentBill').value) || 0;
       const publicLighting = parseFloat(document.getElementById('publicLighting').value) || 0;
       const desconto = parseFloat(document.getElementById('desconto').value) || 0;
+      const grupo = document.getElementById('grupo').value;
 
-      const parteNegociavel = currentBill - publicLighting;
+      const reservaMinima = reservasMinimasPorGrupo[grupo] || 0;
+      const parteBruta = currentBill - publicLighting;
+      const consumoEstimadoKwh = 2312;
+      const tarifaEstimativa = consumoEstimadoKwh > 0 ? parteBruta / consumoEstimadoKwh : 1.0;
+      const kwReserva = reservaMinima; // agora considera em kW, como a regra de GD exige
+      const valorReserva = kwReserva * tarifaEstimativa;
+
+      const parteNegociavel = Math.max(parteBruta - valorReserva, 0);
       const descontoValor = parteNegociavel * (desconto / 100);
       const valorComDesconto = currentBill - descontoValor;
       const economiaAnual = descontoValor * 12;
+
+      const valorMedioKwh = parteNegociavel > 0 ? parteNegociavel / (parteNegociavel / tarifaEstimativa) : 0;
+
+      const economiaAnualVerde = (parteNegociavel * (desconto / 100)) * 12;
+      const economiaAnualAmarela = Math.round(economiaAnualVerde * ((tarifaEstimativa + 0.01885) / tarifaEstimativa));
+      const economiaAnualVermelha1 = Math.round(economiaAnualVerde * ((tarifaEstimativa + 0.04463) / tarifaEstimativa));
+      const economiaAnualVermelha2 = Math.round(economiaAnualVerde * ((tarifaEstimativa + 0.07877) / tarifaEstimativa));
 
       document.getElementById('resumoOriginal').innerText = currentBill.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
       document.getElementById('resumoNegociavel').innerText = parteNegociavel.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('resumoReserva').innerText = valorReserva.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
       document.getElementById('resumoDescontoValor').innerText = descontoValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
       document.getElementById('resumoDesconto').innerText = valorComDesconto.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
       document.getElementById('resumoAnual').innerText = economiaAnual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('resumoValorKwh').innerText = valorMedioKwh.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+      document.getElementById('economiaVerde').innerText = economiaAnualVerde.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('economiaAmarela').innerText = economiaAnualAmarela.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('economiaV1').innerText = economiaAnualVermelha1.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('economiaV2').innerText = economiaAnualVermelha2.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+      document.getElementById('porcentagemVerde').innerText = Math.round(desconto) + "%";
+      document.getElementById('porcentagemAmarela').innerText = Math.ceil((desconto / 10) * 12) + "%";
+      document.getElementById('porcentagemV1').innerText = Math.ceil((desconto / 10) * 16) + "%";
+      document.getElementById('porcentagemV2').innerText = Math.ceil((desconto / 10) * 20) + "%";
+
+            document.getElementById('resumoDescontoAmarela').innerText = calcDescontoBandeira(12, 0.01885).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('resumoDescontoV1').innerText = calcDescontoBandeira(15, 0.04463).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('economiaVerde').innerText = economiaAnualVerde.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('economiaAmarela').innerText = economiaAnualAmarela.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('economiaV1').innerText = economiaAnualVermelha1.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('economiaV2').innerText = economiaAnualVermelha2.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+      document.getElementById('porcentagemVerde').innerText = Math.round(desconto) + "%";
+      document.getElementById('porcentagemAmarela').innerText = Math.round((desconto * ((tarifaEstimativa + 0.01885) / tarifaEstimativa))) + "%";
+      document.getElementById('porcentagemV1').innerText = Math.round((desconto * ((tarifaEstimativa + 0.04463) / tarifaEstimativa))) + "%";
+      document.getElementById('porcentagemV2').innerText = Math.round((desconto * ((tarifaEstimativa + 0.07877) / tarifaEstimativa))) + "%";
     }
 
-    async function enviarParaMake() {
+    document.getElementById('currentBill').addEventListener('input', atualizarResumo);
+    document.getElementById('publicLighting').addEventListener('input', atualizarResumo);
+    document.getElementById('desconto').addEventListener('change', atualizarResumo);
+    document.getElementById('grupo').addEventListener('change', atualizarResumo);
+    function enviarParaMake() {
       const currentBill = parseFloat(document.getElementById('currentBill').value) || 0;
       const publicLighting = parseFloat(document.getElementById('publicLighting').value) || 0;
       const desconto = parseFloat(document.getElementById('desconto').value) || 0;
+      const grupo = document.getElementById('grupo').value;
+      const reservaMinima = reservasMinimasPorGrupo[grupo] || 0;
+      const parteBruta = currentBill - publicLighting;
+      const tarifaEstimativa = parteBruta > 0 ? parteBruta / 2312 : 1.0;
+      const kwReserva = reservaMinima;
+      const valorReserva = kwReserva * tarifaEstimativa;
+      const parteNegociavel = Math.max(parteBruta - valorReserva, 0);
 
-      const parteNegociavel = currentBill - publicLighting;
-      const descontoValor = parteNegociavel * (desconto / 100);
-      const valorComDesconto = currentBill - descontoValor;
-      const economiaAnual = descontoValor * 12;
-      const dataProposta = new Date().toLocaleDateString("pt-BR");
+      const economiaAnualVerde = (parteNegociavel * (desconto / 100)) * 12;
+      const economiaAnualAmarela = economiaAnualVerde * ((tarifaEstimativa + 0.01885) / tarifaEstimativa);
+      const economiaAnualVermelha1 = economiaAnualVerde * ((tarifaEstimativa + 0.04463) / tarifaEstimativa);
+      const economiaAnualVermelha2 = economiaAnualVerde * ((tarifaEstimativa + 0.07877) / tarifaEstimativa);
+      const valorDescontoAmarela = parteNegociavel * 0.01885 * (12 / 100);
+      const valorDescontoVermelha1 = parteNegociavel * 0.04463 * (15 / 100);
+      const valorDescontoVermelha2 = parteNegociavel * 0.07877 * (20 / 100);
 
       const dados = {
+        economia_anual_verde: economiaAnualVerde,
+        economia_anual_amarela: economiaAnualAmarela,
+        economia_anual_vermelha_1: economiaAnualVermelha1,
+        economia_anual_vermelha_2: economiaAnualVermelha2,
         nomeCliente: document.getElementById('nomeCliente').value,
         email: document.getElementById('email').value,
         distribuidora: document.getElementById('distribuidora').value,
-        grupo: document.getElementById('grupo').value,
-        faturaOriginal: currentBill.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
-        custoNegociavel: parteNegociavel.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
-        descontoAplicado: descontoValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
-        valorComDesconto: valorComDesconto.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
-        economiaAnual: economiaAnual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        grupo: grupo,
+        faturaOriginal: currentBill,
+        custoNegociavel: parteNegociavel,
+        descontoAplicado: parteNegociavel * (desconto / 100),
+        valorComDesconto: currentBill - (parteNegociavel * (desconto / 100)),
+        economiaAnual: (parteNegociavel * (desconto / 100)) * 12,
         percentualDesconto: desconto,
-        data_proposta: dataProposta
+        valorReserva: valorReserva,
+        valorMedioKwh: tarifaEstimativa,
+        porcentagem_de_desconto_verde: 10,
+        porcentagem_de_desconto_verde: Math.round(desconto),
+        porcentagem_de_desconto_amarela: 12,
+        porcentagem_de_desconto_amarela: Math.ceil((desconto / 10) * 12),
+        porcentagem_de_desconto_vermelha_1: 15,
+        porcentagem_de_desconto_vermelha_1: Math.ceil((desconto / 10) * 16),
+        porcentagem_de_desconto_vermelha_2: 20,
+        porcentagem_de_desconto_vermelha_2: Math.ceil((desconto / 10) * 20),
+        data_proposta: new Date().toLocaleDateString("pt-BR")
       };
 
-      const webhookURL = 'https://hook.us2.make.com/kl5n1t0om7ogrfhak8ockoy44b1yalwe';
-
-      try {
-        await fetch(webhookURL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dados)
-        });
-        alert("Proposta enviada para o Make com sucesso!");
-      } catch (error) {
-        alert("Erro ao enviar para o Make.");
-        console.error(error);
-      }
+      fetch('https://hook.us2.make.com/kl5n1t0om7ogrfhak8ockoy44b1yalwe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dados)
+      })
+        .then(res => alert("Proposta enviada para o Make com sucesso!"))
+        .catch(err => alert("Erro ao enviar para o Make."));
     }
-
-    document.getElementById('distribuidora').addEventListener('change', atualizarResumo);
-    document.getElementById('grupo').addEventListener('change', atualizarResumo);
-    carregarDistribuidoras();
-  </script>
+</script>
+<script src="/js/script.js"></script>
 </body>
 </html>
