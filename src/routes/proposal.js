@@ -1,6 +1,5 @@
 const express = require('express');
 const axios = require('axios');
-const gerarPropostaPDF = require('../utils/generateProposal');
 const router = express.Router();
 
 router.get('/distribuidoras', async (req, res) => {
@@ -62,14 +61,6 @@ router.post('/', async (req, res) => {
       economiaAnual: economiaAnual.toFixed(2),
       email
     };
-
-    await gerarPropostaPDF({
-      nomeCliente: email.split('@')[0], // ou outro campo se quiser o nome
-      currentBill,
-      discountedBill: valorComDesconto,
-      monthlySavings: economiaMensal,
-      annualSavings: economiaAnual
-    });
 
     res.json(proposta);
   } catch (error) {
