@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Gerador de Propostas de Economia com Energia</title>
+  <style>
+    body { font-family: Arial; margin: 30px; display: flex; gap: 50px; }
+    label { display: block; margin-top: 15px; }
+    select, input { width: 300px; padding: 6px; }
+    button { margin-top: 20px; padding: 10px 20px; font-weight: bold; }
+    #formulario { flex: 1; }
+    #resumo { flex: 1; border-left: 2px solid #ccc; padding-left: 30px; }
+    .linha { margin-bottom: 10px; }
+    h2 { border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+  </style>
+</head>
+<body>
+
+  <div id="formulario">
+    <h1>Gerador de Propostas de Economia com Energia</h1>
+
+    <label for="distribuidora">Distribuidora:</label>
+    <select id="distribuidora">
+      <option value="">Carregando...</option>
+    </select>
+
+    <label for="grupo">Grupo Tarifário:</label>
+    <select id="grupo">
+      <option value="">Selecione</option>
+      <option value="B1">B1 - Residencial</option>
+      <option value="B2">B2 - Rural</option>
+      <option value="B3">B3 - Comercial</option>
+      <option value="B4">B4 - Industrial</option>
+      <option value="A2">A2 - Alta Tensão 88 a 138kV</option>
+      <option value="A3">A3 - Alta Tensão 69kV</option>
+      <option value="A4">A4 - Alta Tensão 2,3 a 25kV</option>
+    </select>
+
+    <label for="currentBill">Valor total da fatura (R$):</label>
+    <input type="number" id="currentBill" step="0.01" oninput="atualizarResumo()" />
+
+    <label for="publicLighting">Iluminação pública e outros (R$):</label>
+    <input type="number" id="publicLighting" step="0.01" oninput="atualizarResumo()" />
+
+    <label for="desconto">Desconto sobre parte negociável (%):</label>
+    <select id="desconto" onchange="atualizarResumo()">
+      <option value="10">10%</option>
+      <option value="9">9%</option>
+      <option value="8">8%</option>
+      <option value="7">7%</option>
+      <option value="6">6%</option>
+      <option value="5">5%</option>
+    </select>
+
+    <label for="nomeCliente">Nome do Cliente:</label>
+    <input type="text" id="nomeCliente" />
+
+    <label for="email">E-mail do cliente:</label>
+    <input type="email" id="email" />
+
+    <button onclick="enviarParaMake()">Enviar para Make</button>
+  </div>
+
+  <div id="resumo">
+    <h2>Resumo da Proposta</h2>
+    <div class="linha">Fatura Original: <span id="resumoOriginal">R$ 0,00</span></div>
+    <div class="linha">Custo Negociável: <span id="resumoNegociavel">R$ 0,00</span></div>
+    <div class="linha">Desconto Aplicado: <span id="resumoDescontoValor">R$ 0,00</span></div>
+    <div class="linha">Valor com Desconto: <span id="resumoDesconto">R$ 0,00</span></div>
+    <div class="linha">Economia Anual: <span id="resumoAnual">R$ 0,00</span></div>
+  </div>
+
+  <script>
+    async function carregarDistribuidoras() {
+      try {
+        const response = await fetch('/proposal/distribuidoras');
+        const nomes = await response.json();
+        const select = document.getElementById("distribuidora");
+        select.innerHTML = '<option value="">Selecione</option>' +
+          nomes.map(nome => `<option value="${nome}">${nome}</option>`).join('');
+      } catch (e) {
+        alert("Erro ao carregar distribuidoras.");
+        console.error(e);
+      }
+    }
+
+    function atualizarResumo() {
+      const currentBill = parseFloat(document.getElementById('currentBill').value) || 0;
+      const publicLighting = parseFloat(document.getElementById('publicLighting').value) || 0;
+      const desconto = parseFloat(document.getElementById('desconto').value) || 0;
+
+      const parteNegociavel = currentBill - publicLighting;
+      const descontoValor = parteNegociavel * (desconto / 100);
+      const valorComDesconto = currentBill - descontoValor;
+      const economiaAnual = descontoValor * 12;
+
+      document.getElementById('resumoOriginal').innerText = currentBill.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('resumoNegociavel').innerText = parteNegociavel.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('resumoDescontoValor').innerText = descontoValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('resumoDesconto').innerText = valorComDesconto.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      document.getElementById('resumoAnual').innerText = economiaAnual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+    async function enviarParaMake() {
+      const currentBill = parseFloat(document.getElementById('currentBill').value) || 0;
+      const publicLighting = parseFloat(document.getElementById('publicLighting').value) || 0;
+      const desconto = parseFloat(document.getElementById('desconto').value) || 0;
+
+      const parteNegociavel = currentBill - publicLighting;
+      const descontoValor = parteNegociavel * (desconto / 100);
+      const valorComDesconto = currentBill - descontoValor;
+      const economiaAnual = descontoValor * 12;
+      const dataProposta = new Date().toLocaleDateString("pt-BR");
+
+      const dados = {
+        nomeCliente: document.getElementById('nomeCliente').value,
+        email: document.getElementById('email').value,
+        distribuidora: document.getElementById('distribuidora').value,
+        grupo: document.getElementById('grupo').value,
+        faturaOriginal: currentBill.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        custoNegociavel: parteNegociavel.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        descontoAplicado: descontoValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        valorComDesconto: valorComDesconto.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        economiaAnual: economiaAnual.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        percentualDesconto: desconto,
+        data_proposta: dataProposta
+      };
+
+      const webhookURL = 'https://hook.us2.make.com/kl5n1t0om7ogrfhak8ockoy44b1yalwe';
+
+      try {
+        await fetch(webhookURL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dados)
+        });
+        alert("Proposta enviada para o Make com sucesso!");
+      } catch (error) {
+        alert("Erro ao enviar para o Make.");
+        console.error(error);
+      }
+    }
+
+    document.getElementById('distribuidora').addEventListener('change', atualizarResumo);
+    document.getElementById('grupo').addEventListener('change', atualizarResumo);
+    carregarDistribuidoras();
+  </script>
+</body>
+</html>
